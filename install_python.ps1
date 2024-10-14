@@ -12,30 +12,28 @@ Invoke-WebRequest -Uri $pythonInstaller -OutFile $pythonInstallerPath
 Write-Host "Installing Python..." -ForegroundColor Green
 Start-Process -Wait -FilePath $pythonInstallerPath -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1"
 
-# Step 4: Verify Python installation and check if it's available in the system PATH
-$pythonExe = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pythonExe) {
-    Write-Host "Python installation failed or not added to PATH." -ForegroundColor Red
-    Exit 1
+# Step 4: Check common installation locations for Python
+$pythonInstallPath = "C:\Program Files\Python310\python.exe"
+
+if (Test-Path $pythonInstallPath) {
+    Write-Host "Python found at $pythonInstallPath. Adding to PATH..." -ForegroundColor Green
+    $pythonDirectory = [System.IO.Path]::GetDirectoryName($pythonInstallPath)
+
+    # Step 5: Update PATH permanently for all users
+    [Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";$pythonDirectory", [EnvironmentVariableTarget]::Machine)
+
+    # Step 6: Refresh the PATH in the current PowerShell session
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+    # Step 7: Verify Python installation
+    $pythonExe = Get-Command python -ErrorAction SilentlyContinue
+    if ($pythonExe) {
+        Write-Host "Python successfully added to PATH! Path: $($pythonExe.Source)" -ForegroundColor Green
+    } else {
+        Write-Host "Python installation failed or could not be added to PATH." -ForegroundColor Red
+        Exit 1
+    }
 } else {
-    Write-Host "Python installed successfully! Path: $($pythonExe.Source)" -ForegroundColor Green
+    Write-Host "Python installation failed or not installed in the default location." -ForegroundColor Red
+    Exit 1
 }
-
-# Step 5: Ensure Python is added to PATH for both SSH and normal terminals
-$pythonInstallPath = "$($pythonExe.Source)"
-$pythonInstallDirectory = [System.IO.Path]::GetDirectoryName($pythonInstallPath)
-
-# Update system PATH for current session
-[Environment]::SetEnvironmentVariable("PATH", "$env:PATH;$pythonInstallDirectory", [EnvironmentVariableTarget]::Machine)
-
-# Inform user about PATH update
-Write-Host "Python has been added to the system PATH. Path: $pythonInstallDirectory" -ForegroundColor Green
-
-# Reload PATH for current session
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine")
-
-# Step 6: Test Python installation
-Write-Host "Testing Python version..." -ForegroundColor Green
-python --version
-
-Write-Host "Python installation is complete." -ForegroundColor Green
